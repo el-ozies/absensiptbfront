@@ -6,13 +6,12 @@ import Register from '../pages/Register';
 import DashboardPegawai from '../pages/Pegawai/Dashboard';
 import Absen from '../pages/Pegawai/Absen';
 import Riwayat from '../pages/Pegawai/Riwayat';
+import AjukanIzin from '../pages/Pegawai/AjukanIzin';
+import RiwayatIzin from '../pages/Pegawai/RiwayatIzin';
 
 import DashboardAdmin from '../pages/Admin/Dashboard';
 import RekapAbsensi from '../pages/Admin/RekapAbsensi';
-
-import AjukanIzin from '../pages/izin/AjukanIzin';
-import RiwayatIzin from '../pages/izin/RiwayatIzin';
-import ValidasiIzin from '../pages/izin/ValidasiIzin';
+import ValidasiIzin from '../pages/Admin/ValidasiIzin';
 
 import PrivateRoute from './PrivateRoute';
 

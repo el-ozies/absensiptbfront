@@ -1,7 +1,6 @@
-// src/pages/izin/AjukanIzin.jsx
 import React, { useState } from 'react';
 import LayoutWrapper from '../../components/LayoutWrapper';
-import { ajukanIzin } from '../../services/izinService';
+import { ajukanIzin as ajukanIzinAPI } from '../../api/axios';
 
 export default function AjukanIzin() {
   const [form, setForm] = useState({
@@ -13,14 +12,16 @@ export default function AjukanIzin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const pegawai_id = localStorage.getItem('pegawai_id');
-    if (!pegawai_id) {
-      alert('Pegawai ID tidak ditemukan!');
+    // Validasi: tanggal_selesai harus >= tanggal_mulai
+    const mulai = new Date(form.tanggal_mulai);
+    const selesai = new Date(form.tanggal_selesai);
+    if (selesai < mulai) {
+      alert('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
       return;
     }
 
     try {
-      await ajukanIzin({ ...form, pegawai_id });
+      await ajukanIzinAPI(form);
       alert('Izin berhasil diajukan.');
       setForm({ tanggal_mulai: '', tanggal_selesai: '', keterangan: '' });
     } catch (error) {
@@ -52,6 +53,7 @@ export default function AjukanIzin() {
               onChange={e => setForm({ ...form, tanggal_selesai: e.target.value })}
               required
               className="w-full border px-3 py-2 rounded"
+              min={form.tanggal_mulai} // ⬅️ Validasi di sisi input agar tidak bisa pilih mundur
             />
           </div>
           <div>

@@ -1,3 +1,4 @@
+// src/pages/absensi/Absen.jsx
 import React, { useEffect, useState } from 'react';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import api from '../../api/axios';
@@ -15,10 +16,22 @@ const Absen = () => {
   const [loading, setLoading] = useState(false);
 
   const lokasiKantor = { latitude: -7.120436, longitude: 112.600460 };
-  const RADIUS_METER = 2000;
+  const RADIUS_METER = 20000;
+
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3;
+    const rad = (deg) => (deg * Math.PI) / 180;
+    const dLat = rad(lat2 - lat1);
+    const dLon = rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
   const now = new Date();
-  const day = now.getDay(); // 0 = Minggu, 6 = Sabtu
+  const day = now.getDay();
   const hour = now.getHours();
 
   const masukStart = 7;
@@ -26,9 +39,9 @@ const Absen = () => {
   const pulangStart = masukEnd;
   const pulangEnd = 18;
 
-  const isAbsenMasukAllowed = !hariIni && hour >= masukStart && hour < masukEnd;
+  const isAbsenMasukAllowed = (!hariIni || !hariIni.jam_masuk) && hour >= masukStart && hour < masukEnd;
   const isAbsenKeluarAllowed = hariIni && !hariIni.jam_keluar && hour >= pulangStart && hour <= pulangEnd;
-
+  const [loadingHariIni, setLoadingHariIni] = useState(true);
   useEffect(() => {
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -51,16 +64,21 @@ const Absen = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  const getAbsenHariIni = async () => {
-    try {
-      const res = await api.get('/absensi/riwayat');
-      const today = new Date().toISOString().slice(0, 10);
-      const absen = res.data.find((r) => r.tanggal.startsWith(today));
-      setHariIni(absen || null);
-    } catch (err) {
-      console.error('Gagal ambil riwayat absen hari ini');
-    }
-  };
+ const getAbsenHariIni = async () => {
+  try {
+    const res = await api.get('/absensi/riwayat');
+    const today = new Date().toLocaleDateString('id-ID');
+    const absen = res.data.find(
+      (r) => new Date(r.tanggal).toLocaleDateString('id-ID') === today
+    );
+    setHariIni(absen || null);
+  } catch (err) {
+    console.error('Gagal ambil riwayat absen hari ini');
+  } finally {
+    setLoadingHariIni(false);
+  }
+};
+
 
   const handleAbsen = async () => {
     if (!latitude || !longitude) {
@@ -88,7 +106,7 @@ const Absen = () => {
     } catch (err) {
       const response = err.response?.data;
       if (response?.absen) {
-        setHariIni(response.absen); // Update UI jika backend kirim info absen
+        setHariIni(response.absen);
       }
       setStatus('error');
       setMessage(response?.message || 'Gagal melakukan absensi.');
@@ -118,18 +136,6 @@ const Absen = () => {
       : hariIni && hariIni.jam_keluar
       ? 'Anda sudah menyelesaikan absen hari ini.'
       : 'Di luar jam absen.';
-
-  const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3;
-    const rad = (deg) => (deg * Math.PI) / 180;
-    const dLat = rad(lat2 - lat1);
-    const dLon = rad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
 
   const waktuSekarang = now.toLocaleString('id-ID', {
     weekday: 'long',
@@ -168,22 +174,25 @@ const Absen = () => {
               </p>
             </>
           )}
-
-          <button
-            onClick={handleAbsen}
-            disabled={tombolDisabled}
-            className={`mt-6 px-6 py-3 rounded-md text-white font-semibold transition ${
-              tombolDisabled
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            {loading ? 'Mengirim...' : tombolLabel}
-          </button>
+{loadingHariIni ? (
+  <p className="mt-6 text-gray-500 text-sm">Memuat status absen...</p>
+) : (
+  <button
+    onClick={handleAbsen}
+    disabled={tombolDisabled}
+    className={`mt-6 px-6 py-3 rounded-md text-white font-semibold transition ${
+      tombolDisabled
+        ? 'bg-gray-400 cursor-not-allowed'
+        : 'bg-blue-600 hover:bg-blue-700'
+    }`}
+  >
+    {loading ? 'Mengirim...' : tombolLabel}
+  </button>
+)}
 
           <div className="flex items-center gap-2 mt-6 text-gray-600 text-sm">
             <MapPin size={16} />
-            <p><strong>Radius:</strong> Kantor Pusat Transformasi Bersama Manyar – 2 KM</p>
+            <p><strong>Radius:</strong> Kantor PTB Manyar – 2 KM</p>
           </div>
 
           <div className="flex items-center gap-2 mt-4 text-sm text-blue-800">

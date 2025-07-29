@@ -7,7 +7,7 @@ const Sidebar = ({ role }) => {
 
   const menuPegawai = [
     { to: '/pegawai/dashboard', label: 'Dashboard' },
-    { to: '/pegawai/absen', label: 'Absen' },
+    { to: '/pegawai/absen', label: 'Absensi' },
     { to: '/pegawai/riwayat', label: 'Riwayat Absensi' },
     { to: '/izin/ajukan', label: 'Ajukan Izin' },
     { to: '/izin/riwayat', label: 'Riwayat Izin' },

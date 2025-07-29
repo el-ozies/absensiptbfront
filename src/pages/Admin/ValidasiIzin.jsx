@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getSemuaIzin, validasiIzin } from '../../services/izinService';
+import { getSemuaIzin, validasiIzin } from '../../api/axios';
 
 export default function ValidasiIzin() {
   const [izin, setIzin] = useState([]);
