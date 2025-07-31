@@ -19,11 +19,16 @@ const Absen = () => {
 
   const navigate = useNavigate();
   const lokasiKantor = { latitude: -7.120436, longitude: 112.600460 };
-  const RADIUS_METER = 10000; // 10 km (sementara)
+  const RADIUS_METER = 100000; // ganti 100000 dengan 2000 untuk radius 2km asli
 
-  // Reset dan baca localStorage
   useEffect(() => {
     const today = new Date().toLocaleDateString('id-ID');
+
+    // Bersihkan jika ada absen_status 'undefined'
+    const raw = localStorage.getItem('absen_status');
+    if (raw === 'undefined') {
+      localStorage.removeItem('absen_status');
+    }
 
     const lastAbsenDate = localStorage.getItem('lastAbsenDate');
     if (lastAbsenDate !== today) {
@@ -31,21 +36,22 @@ const Absen = () => {
       localStorage.setItem('lastAbsenDate', today);
     }
 
-    const stored = localStorage.getItem('absen_status');
-    if (stored) {
-      const absen = JSON.parse(stored);
-      const tanggal = new Date(absen.tanggal).toLocaleDateString('id-ID');
+    try {
+      const stored = JSON.parse(localStorage.getItem('absen_status') || 'null');
+      const tanggal = new Date(stored?.tanggal).toLocaleDateString('id-ID');
       if (tanggal === today) {
-        setHariIni(absen);
+        setHariIni(stored);
         setLoadingHariIni(false);
         return;
       }
+    } catch (e) {
+      console.warn('Gagal parsing absen_status, dihapus.');
+      localStorage.removeItem('absen_status');
     }
 
     getAbsenHariIni();
   }, []);
 
-  // Cek token
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -85,7 +91,9 @@ const Absen = () => {
       const today = new Date().toLocaleDateString('id-ID');
       const absen = res.data.find((r) => new Date(r.tanggal).toLocaleDateString('id-ID') === today);
       setHariIni(absen || null);
-      if (absen) localStorage.setItem('absen_status', JSON.stringify(absen));
+      if (absen) {
+        localStorage.setItem('absen_status', JSON.stringify(absen));
+      }
     } catch (err) {
       console.error('Gagal ambil riwayat absen hari ini');
     } finally {
@@ -122,9 +130,12 @@ const Absen = () => {
       return;
     }
 
-    const stored = JSON.parse(localStorage.getItem('absen_status'));
-    const hari = new Date().toLocaleDateString('id-ID');
+    let stored = null;
+    try {
+      stored = JSON.parse(localStorage.getItem('absen_status') || 'null');
+    } catch {}
 
+    const hari = new Date().toLocaleDateString('id-ID');
     if (stored && new Date(stored.tanggal).toLocaleDateString('id-ID') === hari && stored.jam_masuk && !isAbsenKeluarAllowed) {
       setStatus('error');
       setMessage('Anda sudah absen masuk hari ini.');
@@ -146,7 +157,9 @@ const Absen = () => {
 
       setStatus('success');
       setMessage(res.data.message);
-      localStorage.setItem('absen_status', JSON.stringify(res.data.absen));
+      if (res.data.absen) {
+        localStorage.setItem('absen_status', JSON.stringify(res.data.absen));
+      }
       await getAbsenHariIni();
     } catch (err) {
       const response = err.response?.data;

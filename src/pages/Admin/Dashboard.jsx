@@ -2,30 +2,43 @@ import React, { useEffect, useState } from 'react';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import StatBox from '../../components/admin/StatBox';
 import ChartKehadiran from '../../components/admin/ChartKehadiran';
-import { getDashboardStatistik } from '../../api/axios';
+import { getDashboardStatistik, getChartKehadiran } from '../../api/axios';
 
 const DashboardAdmin = () => {
   const [stat, setStat] = useState({
     hadir: 0,
-    alpha: 0,
+    izin_menunggu: 0,
     terlambat: 0,
+    total_pegawai: 0,
+    hari_kerja: 0,
   });
 
+  const [chartData, setChartData] = useState([]);
+
   useEffect(() => {
-    const fetchStat = async () => {
+    const fetchStatistik = async () => {
       try {
-        const data = await getDashboardStatistik(); // langsung data, bukan res.data
-        setStat({
-          hadir: data.hadir || 0,
-          alpha: data.alpha || 0,
-          terlambat: data.terlambat || 0,
-        });
+        const res = await getDashboardStatistik();
+        if (res) {
+          setStat(res);
+        }
       } catch (err) {
-        console.error('Gagal ambil statistik:', err);
+        console.error('Gagal ambil data statistik:', err);
       }
     };
 
-    fetchStat();
+    const fetchChartData = async () => {
+      try {
+        const data = await getChartKehadiran();
+        setChartData(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Gagal ambil data chart:', error);
+        setChartData([]);
+      }
+    };
+
+    fetchStatistik();
+    fetchChartData();
   }, []);
 
   return (
@@ -34,17 +47,19 @@ const DashboardAdmin = () => {
         <h1 className="text-2xl font-bold text-gray-800">Dashboard Admin</h1>
         <p className="text-gray-600">Selamat datang kembali, Admin!</p>
 
-        {/* Stat Box */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Statistik Box */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatBox label="Total Hadir" value={stat.hadir} type="hadir" />
-          <StatBox label="Alpha" value={stat.alpha} type="alpha" />
+          <StatBox label="Izin Menunggu Validasi" value={stat.izin_menunggu} type="alpha" />
           <StatBox label="Terlambat" value={stat.terlambat} type="terlambat" />
+          <StatBox label="Pegawai Aktif" value={stat.total_pegawai} type="hadir" />
+          <StatBox label="Hari Kerja Bulan Ini" value={stat.hari_kerja} type="terlambat" />
         </div>
 
-        {/* Chart */}
+        {/* Chart Kehadiran */}
         <div className="bg-white rounded-xl shadow-md p-4 mt-6">
           <h2 className="text-lg font-semibold mb-4">Grafik Kehadiran Harian</h2>
-          <ChartKehadiran />
+          <ChartKehadiran data={chartData} />
         </div>
       </div>
     </LayoutWrapper>

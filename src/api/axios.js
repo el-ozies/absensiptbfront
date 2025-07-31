@@ -46,20 +46,26 @@ export const getRiwayatAbsensi = async () => {
   return res.data;
 };
 
-export const getRekapAbsensi = async (tanggal = null) => {
-  const res = await api.get('/absensi/rekap', {
-    params: tanggal ? { tanggal } : {},
-  });
-  return res.data;
+export const getRekapAbsensi = async (tanggal) => {
+  try {
+    const res = await api.get('/absensi/rekap', {
+      params: tanggal ? { tanggal } : {},
+    });
+    return res.data;
+  } catch (err) {
+    console.error('Gagal ambil rekap absensi:', err);
+    return [];
+  }
 };
+
 
 export const getDashboardStatistik = async () => {
   const res = await api.get('/absensi/statistik');
   return res.data;
 };
 
-export const getChartKehadiran = async () => {
-  const res = await api.get('/absensi/chart');
+export const getChartKehadiran = async (bulan, tahun) => {
+  const res = await axios.get(`/absensi/chart?bulan=${bulan}&tahun=${tahun}`);
   return res.data;
 };
 
@@ -83,7 +89,7 @@ export const getRiwayatIzin = async () => {
 
 
 export const getSemuaIzin = async () => {
-  const res = await api.get('/izin');
+  const res = await api.get('/izin/all');
   return res.data;
 };
 
@@ -105,6 +111,17 @@ export const createUser = async (payload) => {
   const res = await api.post('/users', payload);
   return res.data;
 };
+
+export const updateUser = async (id, payload) => {
+  const res = await api.put(`/users/${id}`, payload);
+  return res.data;
+};
+
+export const deleteUser = async (id) => {
+  const res = await api.delete(`/users/${id}`);
+  return res.data;
+};
+
 
 // ==============================
 // 📊 OPSIONAL: LOG AKTIVITAS (ADMIN)

@@ -1,5 +1,11 @@
 import React from 'react';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  FileClock,
+  CalendarDays,
+} from 'lucide-react';
 
 const iconMap = {
   hadir: {
@@ -13,6 +19,14 @@ const iconMap = {
   terlambat: {
     icon: <Clock className="text-yellow-500" size={20} />,
     color: 'text-yellow-500',
+  },
+  izin: {
+    icon: <FileClock className="text-blue-500" size={20} />,
+    color: 'text-blue-500',
+  },
+  hariKerja: {
+    icon: <CalendarDays className="text-indigo-500" size={20} />,
+    color: 'text-indigo-500',
   },
 };
 

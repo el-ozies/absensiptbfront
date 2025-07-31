@@ -15,9 +15,10 @@ const Sidebar = ({ role }) => {
 
   const menuAdmin = [
     { to: '/admin/dashboard', label: 'Dashboard' },
-    { to: '/admin/rekap', label: 'Rekap' },
-    { section: 'Izin Pegawai' },
-    { to: '/izin/validasi', label: 'Validasi Izin' },
+    { to: '/admin/rekap', label: 'Rekap Absensi' },
+    { to: '/admin/pegawai', label: 'Manajemen Pegawai' },
+    // { section: 'Izin Pegawai' },
+    { to: '/izin/validasi', label: 'Validasi Izin Pegawai' },
   ];
 
   const menu = role === 'admin' ? menuAdmin : menuPegawai;
