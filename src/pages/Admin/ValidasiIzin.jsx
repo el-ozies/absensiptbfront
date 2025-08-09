@@ -1,99 +1,99 @@
-import React, { useEffect, useState } from 'react';
-import LayoutWrapper from '../../components/LayoutWrapper';
-import { getSemuaIzin, validasiIzin } from '../../api/axios';
+// src/pages/admin/ValidasiIzin.jsx
+import React, { useState, useEffect } from "react";
+import LayoutWrapper from "../../components/common/LayoutWrapper";
+import { getSemuaIzin, validasiIzin } from "../../api/izin";
+import { Check, XCircle } from "lucide-react";
 
 const ValidasiIzin = () => {
-  const [izin, setIzin] = useState([]);
+  const [izinList, setIzinList] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-  const fetchData = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
       const res = await getSemuaIzin();
-      const data = Array.isArray(res) ? res : res.data;
-      setIzin(data || []);
+      setIzinList(res.data || []);
     } catch (err) {
-      console.error('Gagal mengambil data izin:', err);
-      setIzin([]);
+      console.error("Gagal memuat izin menunggu", err);
     }
+    setLoading(false);
   };
-  fetchData();
-}, []);
 
-// Tambahkan di atas komponen
-const formatTanggal = (iso) => {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
-};
+  const handleValidasi = async (id, status) => {
+    const confirmText =
+      status === "disetujui" ? "Setujui izin ini?" : "Tolak izin ini?";
+    if (!window.confirm(confirmText)) return;
 
-
-  const updateStatus = async (id, status) => {
     try {
       await validasiIzin(id, status);
-      setIzin(prev => prev.map(i => (i.id === id ? { ...i, status } : i)));
+      alert(`Izin berhasil ${status}`);
+      loadData();
     } catch (err) {
-      alert('Gagal memperbarui status');
+      console.error(`Gagal memproses izin ${status}`, err);
+      alert("Gagal memproses izin");
     }
   };
 
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const formatTanggal = (tgl) =>
+    new Date(tgl).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
   return (
-    <LayoutWrapper>
-      <div className="max-w-4xl mx-auto mt-6">
-        <h2 className="text-2xl font-semibold mb-4">Validasi Izin Pegawai</h2>
-        <table className="w-full border text-sm">
-          <thead>
-            <tr className="bg-gray-200">
-              <th className="px-3 py-2 border">Nama</th>
-              <th className="px-3 py-2 border">Mulai</th>
-              <th className="px-3 py-2 border">Selesai</th>
-              <th className="px-3 py-2 border">Status</th>
-              <th className="px-3 py-2 border">Keterangan</th>
-              <th className="px-3 py-2 border">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {izin.map((i) => (
-              <tr key={i.id} className="text-center">
-                <td className="border px-2 py-1">{i.nama}</td>
-                <td className="border px-2 py-1">{formatTanggal(i.tanggal_mulai)}</td>
-                <td className="border px-2 py-1">{formatTanggal(i.tanggal_selesai)}</td>
-                <td className={`border px-2 py-1 ${i.status === 'disetujui' ? 'text-green-600' : i.status === 'ditolak' ? 'text-red-600' : 'text-yellow-600'}`}>
-                  {i.status}
-                </td>
-                <td className="border px-2 py-1">{i.keterangan}</td>
-                <td className="border px-2 py-1 space-x-1">
-                  {i.status === 'menunggu' && (
-                    <>
-                      <button
-                        onClick={() => updateStatus(i.id, 'disetujui')}
-                        className="bg-green-600 text-white px-2 py-1 rounded text-xs"
-                      >
-                        Setujui
-                      </button>
-                      <button
-                        onClick={() => updateStatus(i.id, 'ditolak')}
-                        className="bg-red-600 text-white px-2 py-1 rounded text-xs"
-                      >
-                        Tolak
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {izin.length === 0 && (
+    <LayoutWrapper title="Validasi Izin">
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold text-gray-800 mb-2">Validasi Izin Pegawai</h1>
+            </div>
+
+      {loading ? (
+        <p className="text-gray-600">Memuat data...</p>
+      ) : izinList.length === 0 ? (
+        <div className="text-center text-gray-500 py-10">Tidak ada izin menunggu validasi.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left border border-gray-200 shadow-sm rounded-md overflow-hidden">
+            <thead className="bg-gray-100 text-gray-700">
               <tr>
-                <td colSpan="5" className="text-center py-3 text-gray-500">
-                  Tidak ada permintaan izin
-                </td>
+                <th className="p-3 border">Nama Pegawai</th>
+                <th className="p-3 border">Tanggal Mulai</th>
+                <th className="p-3 border">Tanggal Selesai</th>
+                <th className="p-3 border">Keterangan</th>
+                <th className="p-3 border text-center">Aksi</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {izinList.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="p-3">{item.nama}</td>
+                  <td className="p-3">{formatTanggal(item.tanggal_mulai)}</td>
+                  <td className="p-3">{formatTanggal(item.tanggal_selesai)}</td>
+                  <td className="p-3">{item.keterangan}</td>
+                  <td className="p-3 flex gap-2 justify-center">
+                    <button
+                      onClick={() => handleValidasi(item.id, "disetujui")}
+                      className="inline-flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg shadow text-sm transition"
+                    >
+                      <Check className="w-4 h-4" /> Setujui
+                    </button>
+                    <button
+                      onClick={() => handleValidasi(item.id, "ditolak")}
+                      className="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg shadow text-sm transition"
+                    >
+                      <XCircle className="w-4 h-4" /> Tolak
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </LayoutWrapper>
   );
 };

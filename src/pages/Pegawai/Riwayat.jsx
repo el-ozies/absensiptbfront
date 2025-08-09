@@ -1,180 +1,160 @@
-import React, { useEffect, useState } from 'react';
-import LayoutWrapper from '../../components/LayoutWrapper';
-import { getRiwayatLengkap } from '../../api/axios';
-
-const bulanList = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-];
+// src/pages/Pegawai/Riwayat.jsx
+import React, { useEffect, useState } from "react";
+import LayoutWrapper from "../../components/common/LayoutWrapper";
+import { getRiwayatAbsensi } from "../../api/absensi";
 
 const Riwayat = () => {
-  const [data, setData] = useState([]);
-  const [search, setSearch] = useState('');
-  const [bulan, setBulan] = useState(new Date().getMonth());
-  const [tahun, setTahun] = useState(new Date().getFullYear());
+  const currentDate = new Date();
+  const [bulan, setBulan] = useState(currentDate.getMonth() + 1);
+  const [tahun, setTahun] = useState(currentDate.getFullYear());
+  const [riwayat, setRiwayat] = useState([]);
+  const [statistik, setStatistik] = useState({
+    hadir: 0,
+    alpha: 0,
+    izin: 0,
+    hariKerja: 0,
+  });
+
+  const fetchRiwayat = async () => {
+    try {
+      const response = await getRiwayatAbsensi(bulan, tahun);
+      const data = response.data;
+      setRiwayat(data.riwayat || []);
+      setStatistik({
+        hadir: data.total_hadir || 0,
+        alpha: data.total_alpha || 0,
+        izin: data.total_izin || 0,
+        hariKerja: data.total_hari_kerja || 0,
+      });
+    } catch (err) {
+      console.error("Gagal mengambil riwayat absensi:", err);
+    }
+  };
 
   useEffect(() => {
-    fetchRiwayat(bulan, tahun);
+    fetchRiwayat();
   }, [bulan, tahun]);
 
-  const fetchRiwayat = async (b = bulan, t = tahun) => {
-    try {
-      const res = await getRiwayatLengkap(b, t);
-      setData(res);
-    } catch (err) {
-      console.error('Gagal ambil riwayat:', err);
+  const bulanOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+  const tahunOptions = [2024, 2025, 2026];
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Hadir":
+        return "bg-green-200 text-green-800";
+      case "Izin":
+        return "bg-blue-200 text-blue-800";
+      case "Alpha":
+        return "bg-red-200 text-red-800";
+      case "Sedang Bekerja":
+        return "bg-yellow-200 text-yellow-800";
+      case "Belum Pulang":
+        return "bg-orange-200 text-orange-800";
+      default:
+        return "bg-gray-200 text-gray-800";
     }
   };
-
-  const parseTanggal = (tanggalStr) => {
-    const [tgl, namaBulan, tahun] = tanggalStr.split(' ');
-    const indexBulan = bulanList.findIndex(b => b.toLowerCase() === namaBulan.toLowerCase());
-    return {
-      tanggal: parseInt(tgl),
-      bulan: indexBulan,
-      tahun: parseInt(tahun)
-    };
-  };
-
-  const getJamWajib = (tanggalStr) => {
-    const { tanggal, bulan, tahun } = parseTanggal(tanggalStr);
-    const tgl = new Date(tahun, bulan, tanggal);
-    const hari = tgl.getDay();
-    if (hari === 6) return 5; // Sabtu
-    if (hari === 5) return 6; // Jumat
-    if (hari >= 1 && hari <= 4) return 7; // Senin–Kamis
-    return 0; // Minggu
-  };
-
-  const formatKeterlambatan = (menit) => {
-    if (!menit || menit <= 0) return '-';
-    const jam = Math.floor(menit / 60);
-    const sisaMenit = menit % 60;
-    if (jam > 0 && sisaMenit > 0) return `${jam} jam ${sisaMenit} menit`;
-    if (jam > 0) return `${jam} jam`;
-    return `${sisaMenit} menit`;
-  };
-
-  const hitungPresentase = (item) => {
-    const jamWajib = getJamWajib(item.tanggal);
-    if (item.status === 'Izin') return 50;
-    if (item.jam_masuk && item.jam_keluar) {
-      const [jm, mm] = item.jam_masuk.split(":").map(Number);
-      const [jk, mk] = item.jam_keluar.split(":").map(Number);
-      const masuk = jm * 60 + mm;
-      const keluar = jk * 60 + mk;
-      const durasi = (keluar - masuk) / 60;
-      const persen = Math.round((durasi / jamWajib) * 100);
-      return persen > 100 ? 100 : persen;
-    }
-    if (item.jam_masuk && !item.jam_keluar) {
-      const { tanggal, bulan, tahun } = parseTanggal(item.tanggal);
-      const tgl = new Date(tahun, bulan, tanggal);
-      const hari = tgl.getDay();
-      const now = new Date();
-      if (tgl < now) return 0;
-    }
-    return 0;
-  };
-
-  const formatStatus = (item) => {
-    const { tanggal, bulan: bln, tahun: thn } = parseTanggal(item.tanggal);
-    const tanggalItem = new Date(thn, bln, tanggal);
-    const sekarang = new Date();
-    const isToday = tanggalItem.toDateString() === sekarang.toDateString();
-
-    if (item.status === 'Izin') return <span className="text-blue-600 font-semibold">Izin</span>;
-    if (item.jam_masuk && item.jam_keluar) return <span className="text-green-600 font-semibold">Hadir</span>;
-    if (item.jam_masuk && !item.jam_keluar) {
-      const jamPulang = tanggalItem.getDay() === 6 ? 14 : (tanggalItem.getDay() === 5 ? 18 : 16);
-      const totalMenitNow = sekarang.getHours() * 60 + sekarang.getMinutes();
-      const batasMenit = jamPulang * 60;
-
-      if (isToday && totalMenitNow < batasMenit) {
-        return <span className="text-yellow-600 font-semibold">Belum Pulang</span>;
-      }
-
-      return <span className="text-green-600 font-semibold">Hadir</span>;
-    }
-    return <span className="text-red-600 font-semibold">Alpha</span>;
-  };
-
-  const dataFiltered = data
-    .filter((item) => item.tanggal.toLowerCase().includes(search.toLowerCase()))
-    .filter((item) => getJamWajib(item.tanggal) > 0)
-
-
-
-  const totalHari = dataFiltered.length;
-  const totalIzin = dataFiltered.filter(d => d.status === 'Izin').length;
-  const totalHadir = dataFiltered.filter(d => d.jam_masuk && d.jam_keluar).length;
-  const totalAlpha = dataFiltered.filter(d => !d.jam_masuk && d.status !== 'Izin').length;
-  const totalPersen = Math.round(
-    dataFiltered.reduce((acc, curr) => acc + hitungPresentase(curr), 0) / (dataFiltered.length || 1)
-  );
 
   return (
     <LayoutWrapper>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Riwayat Absensi</h1>
+      <div className="p-4">
+        <h1 className="text-xl font-bold mb-4">Riwayat Absensi</h1>
 
-        <div className="flex flex-wrap gap-4 items-center mb-4">
-          <select className="border px-3 py-2 rounded" value={bulan} onChange={(e) => setBulan(parseInt(e.target.value))}>
-            {bulanList.map((b, i) => (
-              <option key={i} value={i}>{b}</option>
+        {/* Filter Bulan dan Tahun */}
+        <div className="flex gap-4 mb-4">
+          <select
+            value={bulan}
+            onChange={(e) => setBulan(parseInt(e.target.value))}
+            className="border rounded px-2 py-1"
+          >
+            {bulanOptions.map((b) => (
+              <option key={b} value={b}>
+                {new Date(0, b - 1).toLocaleString("id-ID", { month: "long" })}
+              </option>
             ))}
           </select>
-          <select className="border px-3 py-2 rounded" value={tahun} onChange={(e) => setTahun(parseInt(e.target.value))}>
-            {Array.from({ length: 5 }, (_, i) => 2023 + i).map((y) => (
-              <option key={y} value={y}>{y}</option>
+
+          <select
+            value={tahun}
+            onChange={(e) => setTahun(parseInt(e.target.value))}
+            className="border rounded px-2 py-1"
+          >
+            {tahunOptions.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
             ))}
           </select>
-          <input
-            type="text"
-            placeholder="Cari di sini..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-300 px-3 py-2 rounded shadow-sm"
-          />
         </div>
 
-        <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-          <div>✅ Jumlah Kehadiran: <span className="font-bold text-green-700">{totalHadir}</span></div>
-          <div>📘 Jumlah Izin: <span className="font-bold text-blue-700">{totalIzin}</span></div>
-          <div>❌ Jumlah Alpha: <span className="font-bold text-red-700">{totalAlpha}</span></div>
-          <div>📅 Jumlah Total: <span className="font-bold">{totalHari}</span></div>
-          <div className="col-span-2 md:col-span-1">📊 Persentase Bulan Ini: <span className="font-bold">{totalPersen}%</span></div>
+        {/* Statistik */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="bg-green-100 text-green-800 p-3 rounded-lg shadow">
+            <h2 className="font-semibold">Hadir</h2>
+            <p className="text-xl">{statistik.hadir}</p>
+          </div>
+          <div className="bg-blue-100 text-blue-800 p-3 rounded-lg shadow">
+            <h2 className="font-semibold">Izin</h2>
+            <p className="text-xl">{statistik.izin}</p>
+          </div>
+          <div className="bg-red-100 text-red-800 p-3 rounded-lg shadow">
+            <h2 className="font-semibold">Alpha</h2>
+            <p className="text-xl">{statistik.alpha}</p>
+          </div>
+          <div className="bg-gray-100 text-gray-800 p-3 rounded-lg shadow">
+            <h2 className="font-semibold">Hari Kerja</h2>
+            <p className="text-xl">{statistik.hariKerja}</p>
+          </div>
         </div>
 
-        <div className="overflow-x-auto bg-white shadow rounded-lg">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100 text-gray-700">
-              <tr>
-                <th className="px-4 py-2 border">Tanggal</th>
-                <th className="px-4 py-2 border">Jam Wajib</th>
-                <th className="px-4 py-2 border">Jam Masuk</th>
-                <th className="px-4 py-2 border">Jam Pulang</th>
-                <th className="px-4 py-2 border">Keterlambatan</th>
-                <th className="px-4 py-2 border">Status</th>
-                <th className="px-4 py-2 border">% Kehadiran</th>
+        {/* Tabel Riwayat */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white shadow rounded">
+            <thead>
+              <tr className="bg-gray-200 text-left">
+                <th className="py-2 px-4">Tanggal</th>
+                <th className="py-2 px-4">Jam Wajib</th>
+                <th className="py-2 px-4">Jam Masuk</th>
+                <th className="py-2 px-4">Jam Pulang</th>
+                <th className="py-2 px-4">Jam Aktual</th>
+                <th className="py-2 px-4">Keterlambatan</th>
+                <th className="py-2 px-4">Status</th>
               </tr>
             </thead>
             <tbody>
-              {dataFiltered.length > 0 ? (
-                dataFiltered.map((item, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="px-4 py-2">{item.tanggal}</td>
-                    <td className="px-4 py-2">{item.jam_wajib}</td>
-                    <td className="px-4 py-2">{item.jam_masuk || '-'}</td>
-                    <td className="px-4 py-2">{item.jam_keluar || '-'}</td>
-                    <td className="px-4 py-2">{formatKeterlambatan(item.keterlambatan)}</td>
-                    <td className="px-4 py-2">{formatStatus(item)}</td>
-                    <td className="px-4 py-2 text-center font-semibold">{hitungPresentase(item)}%</td>
+              {riwayat.length > 0 ? (
+                riwayat.map((item, index) => (
+                  <tr key={index} className="border-b">
+                    {/* Tanggal langsung dari backend */}
+                    <td className="py-2 px-4">{item.tanggal || "-"}</td>
+                    <td className="py-2 px-4">{item.jam_wajib || "-"}</td>
+                    <td className="py-2 px-4">{item.jam_masuk || "-"}</td>
+                    <td className="py-2 px-4">{item.jam_pulang || "-"}</td>
+                    <td className="py-2 px-4">{item.jam_aktual || "-"}</td>
+                    <td className="py-2 px-4">
+                      {item.keterlambatan && item.keterlambatan !== "-"
+                        ? `${item.keterlambatan}`
+                        : "-"}
+                    </td>
+                    <td className="py-2 px-4">
+                      <span
+                        className={`px-2 py-1 rounded-full text-sm font-semibold ${getStatusColor(
+                          item.status
+                        )}`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="text-center py-4 text-gray-500">Belum ada data absensi.</td>
+                  <td
+                    colSpan="7"
+                    className="text-center py-4 text-gray-500 italic"
+                  >
+                    Tidak ada data absensi.
+                  </td>
                 </tr>
               )}
             </tbody>

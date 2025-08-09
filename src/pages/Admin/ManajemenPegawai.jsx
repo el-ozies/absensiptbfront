@@ -1,6 +1,7 @@
+// src/pages/Admin/ManajemenPegawai.jsx
 import React, { useEffect, useState } from 'react';
-import { getUsers, deleteUser } from '../../api/axios';
-import LayoutWrapper from '../../components/LayoutWrapper';
+import { getUsers, deleteUser } from '../../api/user';
+import LayoutWrapper from '../../components/common/LayoutWrapper';
 import UserForm from '../../components/admin/UserForm';
 import { Pencil, Trash } from 'lucide-react';
 

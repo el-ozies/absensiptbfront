@@ -1,5 +1,6 @@
+// src/components/admin/UserForm.jsx
 import React, { useState, useEffect } from 'react';
-import { createUser, updateUser } from '../../api/axios';
+import { createUser, updateUser } from '../../api/user';
 
 const UserForm = ({ user, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -13,9 +14,29 @@ const UserForm = ({ user, onClose, onSuccess }) => {
     alamat: '',
   });
 
+  const [jabatanLainnya, setJabatanLainnya] = useState('');
+
+  const daftarJabatan = ['Admin', 'Supervisor', 'Staff', 'Keuangan', 'IT Support', 'Lainnya'];
+
   useEffect(() => {
     if (user) {
-      setFormData({ ...user, password: '' });
+      setFormData({
+        username: user.username || '',
+        password: '',
+        nama: user.nama || '',
+        role: user.role || 'pegawai',
+        nip: user.nip || '',
+        jabatan: user.jabatan || '',
+        no_telp: user.no_telp || '',
+        alamat: user.alamat || '',
+        pegawai_id: user.pegawai_id || null,
+      });
+
+      // Jika jabatan bukan dari daftar → anggap Lainnya
+      if (!daftarJabatan.includes(user.jabatan)) {
+        setFormData((prev) => ({ ...prev, jabatan: 'Lainnya' }));
+        setJabatanLainnya(user.jabatan || '');
+      }
     }
   }, [user]);
 
@@ -26,11 +47,36 @@ const UserForm = ({ user, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (user) {
-      await updateUser(user.id, formData);
-    } else {
-      await createUser(formData);
+
+    const trimmed = {
+      ...formData,
+      username: formData.username.trim(),
+      nama: formData.nama.trim(),
+      nip: formData.nip.trim(),
+      no_telp: formData.no_telp.trim(),
+      alamat: formData.alamat.trim(),
+      jabatan: formData.jabatan === 'Lainnya' ? jabatanLainnya.trim() : formData.jabatan.trim(),
+    };
+
+    const requiredFields = ['username', 'nama', 'nip', 'jabatan', 'no_telp', 'alamat'];
+    for (const field of requiredFields) {
+      if (!trimmed[field]) {
+        alert(`Field "${field}" wajib diisi`);
+        return;
+      }
     }
+
+    if (!user && !formData.password.trim()) {
+      alert('Password wajib diisi saat tambah user');
+      return;
+    }
+
+    if (user) {
+      await updateUser(user.id, trimmed);
+    } else {
+      await createUser(trimmed);
+    }
+
     onSuccess();
   };
 
@@ -53,7 +99,7 @@ const UserForm = ({ user, onClose, onSuccess }) => {
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-gray-600 mb-1">Password</label>
+            <label className="block text-gray-600 mb-1">Password {user ? '(kosongkan jika tidak diubah)' : ''}</label>
             <input
               type="password"
               name="password"
@@ -71,6 +117,7 @@ const UserForm = ({ user, onClose, onSuccess }) => {
               value={formData.nama}
               onChange={handleChange}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none"
+              required
             />
           </div>
           <div>
@@ -92,17 +139,43 @@ const UserForm = ({ user, onClose, onSuccess }) => {
               value={formData.nip}
               onChange={handleChange}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none"
+              required
             />
           </div>
           <div>
             <label className="block text-gray-600 mb-1">Jabatan</label>
-            <input
+            <select
               name="jabatan"
               value={formData.jabatan}
-              onChange={handleChange}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormData((prev) => ({ ...prev, jabatan: value }));
+                if (value !== 'Lainnya') setJabatanLainnya('');
+              }}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none"
-            />
+              required
+            >
+              <option value="">-- Pilih Jabatan --</option>
+              {daftarJabatan.map((j) => (
+                <option key={j} value={j}>{j}</option>
+              ))}
+            </select>
           </div>
+
+          {formData.jabatan === 'Lainnya' && (
+            <div className="col-span-2">
+              <label className="block text-gray-600 mb-1">Jabatan Lainnya</label>
+              <input
+                type="text"
+                value={jabatanLainnya}
+                onChange={(e) => setJabatanLainnya(e.target.value)}
+                placeholder="Masukkan jabatan lainnya"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none"
+                required
+              />
+            </div>
+          )}
+
           <div className="col-span-2">
             <label className="block text-gray-600 mb-1">No Telp</label>
             <input
@@ -110,6 +183,7 @@ const UserForm = ({ user, onClose, onSuccess }) => {
               value={formData.no_telp}
               onChange={handleChange}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none"
+              required
             />
           </div>
           <div className="col-span-2">
@@ -120,6 +194,7 @@ const UserForm = ({ user, onClose, onSuccess }) => {
               onChange={handleChange}
               rows={2}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none"
+              required
             />
           </div>
           <div className="col-span-2 flex justify-end gap-3 mt-2">

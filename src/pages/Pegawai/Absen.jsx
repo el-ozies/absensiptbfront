@@ -1,9 +1,10 @@
+// src/pages/Pegawai/Absen.jsx
 import React, { useEffect, useState } from 'react';
-import LayoutWrapper from '../../components/LayoutWrapper';
+import LayoutWrapper from '../../components/common/LayoutWrapper';
 import api from '../../api/axios';
 import { CheckCircle, XCircle, MapPin, Clock } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
-import MapView from '../../components/MapView';
+import MapView from '../../components/common/MapView';
 import { useNavigate } from 'react-router-dom';
 
 const Absen = () => {
@@ -18,53 +19,46 @@ const Absen = () => {
   const [loadingHariIni, setLoadingHariIni] = useState(true);
 
   const navigate = useNavigate();
+
+  // Lokasi & radius (2 KM)
   const lokasiKantor = { latitude: -7.120436, longitude: 112.600460 };
-  const RADIUS_METER = 100000; // ganti 100000 dengan 2000 untuk radius 2km asli
+  const RADIUS_METER = 2000; // 2 KM
 
-  useEffect(() => {
-    const today = new Date().toLocaleDateString('id-ID');
+  // Format tanggal hari ini (lokal)
+  const todayStr = new Date().toLocaleDateString('id-ID');
 
-    // Bersihkan jika ada absen_status 'undefined'
-    const raw = localStorage.getItem('absen_status');
-    if (raw === 'undefined') {
-      localStorage.removeItem('absen_status');
-    }
-
-    const lastAbsenDate = localStorage.getItem('lastAbsenDate');
-    if (lastAbsenDate !== today) {
-      localStorage.removeItem('absen_status');
-      localStorage.setItem('lastAbsenDate', today);
-    }
-
-    try {
-      const stored = JSON.parse(localStorage.getItem('absen_status') || 'null');
-      const tanggal = new Date(stored?.tanggal).toLocaleDateString('id-ID');
-      if (tanggal === today) {
-        setHariIni(stored);
-        setLoadingHariIni(false);
-        return;
-      }
-    } catch (e) {
-      console.warn('Gagal parsing absen_status, dihapus.');
-      localStorage.removeItem('absen_status');
-    }
-
-    getAbsenHariIni();
-  }, []);
-
+  // Load awal
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       alert('Token tidak ditemukan. Silakan login ulang.');
       navigate('/login');
+      return;
     }
-  }, [navigate]);
 
+    // Cek localStorage
+    try {
+      const stored = JSON.parse(localStorage.getItem('absen_status') || 'null');
+      if (stored && new Date(stored.tanggal).toLocaleDateString('id-ID') === todayStr) {
+        setHariIni(stored);
+        setLoadingHariIni(false);
+        return;
+      }
+    } catch {
+      localStorage.removeItem('absen_status');
+    }
+
+    // Sync dengan backend
+    getAbsenHariIni();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Jam real-time
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Geolocation
   useEffect(() => {
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -72,11 +66,9 @@ const Absen = () => {
         const lng = pos.coords.longitude;
         setLatitude(lat);
         setLongitude(lng);
-        const jarak = getDistance(lat, lng, lokasiKantor.latitude, lokasiKantor.longitude);
-        setIsWithinRadius(jarak <= RADIUS_METER);
+        setIsWithinRadius(getDistance(lat, lng, lokasiKantor.latitude, lokasiKantor.longitude) <= RADIUS_METER);
       },
-      (err) => {
-        console.error(err);
+      () => {
         setStatus('error');
         setMessage('Gagal mengambil lokasi.');
       },
@@ -85,22 +77,25 @@ const Absen = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
+  // API: Get absen hari ini
   const getAbsenHariIni = async () => {
     try {
-      const res = await api.get('/absensi/riwayat');
-      const today = new Date().toLocaleDateString('id-ID');
-      const absen = res.data.find((r) => new Date(r.tanggal).toLocaleDateString('id-ID') === today);
-      setHariIni(absen || null);
-      if (absen) {
-        localStorage.setItem('absen_status', JSON.stringify(absen));
+      const res = await api.get('/absensi/riwayat-hari-ini');
+      if (res.data.length > 0) {
+        setHariIni(res.data[0]);
+        localStorage.setItem('absen_status', JSON.stringify(res.data[0]));
+      } else {
+        setHariIni(null);
+        localStorage.removeItem('absen_status');
       }
-    } catch (err) {
+    } catch {
       console.error('Gagal ambil riwayat absen hari ini');
     } finally {
       setLoadingHariIni(false);
     }
   };
 
+  // Hitung jarak (meter)
   const getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3;
     const rad = (deg) => (deg * Math.PI) / 180;
@@ -113,16 +108,23 @@ const Absen = () => {
     return R * c;
   };
 
-  const day = now.getDay();
+  // Jam aturan (samakan dengan BE)
+  const day = now.getDay(); // 0=Min ... 6=Sab
   const jamMenit = now.getHours() * 60 + now.getMinutes();
-  const masukStart = 7 * 60;
-  const masukEnd = day === 6 ? 14 * 60 : 16 * 60;
-  const pulangStart = masukEnd;
-  const pulangEnd = 18 * 60;
 
-  const isAbsenMasukAllowed = (!hariIni || !hariIni.jam_masuk) && jamMenit >= masukStart && jamMenit < masukEnd;
-  const isAbsenKeluarAllowed = hariIni && !hariIni.jam_keluar && jamMenit >= pulangStart && jamMenit <= pulangEnd;
+  const masukStart = 7 * 60; // 07:00
+  const jamPulangResmi = (day === 6 ? 14 : 16) * 60; // Sabtu 14:00, lainnya 16:00
+  const masukEnd = jamPulangResmi;                    // window masuk s.d. sebelum jam pulang resmi
+  const pulangStart = jamPulangResmi;                 // window pulang mulai jam pulang resmi
+  const pulangEnd = 18 * 60;                          // max 18:00
 
+  const isAbsenMasukAllowed =
+    (!hariIni || !hariIni.jam_masuk) && jamMenit >= masukStart && jamMenit < masukEnd;
+
+  const isAbsenKeluarAllowed =
+    (hariIni && !hariIni.jam_keluar) && jamMenit >= pulangStart && jamMenit <= pulangEnd;
+
+  // Handle klik tombol
   const handleAbsen = async () => {
     if (!latitude || !longitude) {
       setStatus('error');
@@ -130,25 +132,29 @@ const Absen = () => {
       return;
     }
 
-    let stored = null;
-    try {
-      stored = JSON.parse(localStorage.getItem('absen_status') || 'null');
-    } catch {}
-
-    const hari = new Date().toLocaleDateString('id-ID');
-    if (stored && new Date(stored.tanggal).toLocaleDateString('id-ID') === hari && stored.jam_masuk && !isAbsenKeluarAllowed) {
-      setStatus('error');
-      setMessage('Anda sudah absen masuk hari ini.');
-      return;
+    // Cek double absen via localStorage
+    const stored = JSON.parse(localStorage.getItem('absen_status') || 'null');
+    if (stored && new Date(stored.tanggal).toLocaleDateString('id-ID') === todayStr) {
+      if (stored.jam_masuk && !isAbsenKeluarAllowed) {
+        setStatus('error');
+        setMessage('Anda sudah absen masuk hari ini.');
+        return;
+      }
+      if (stored.jam_keluar) {
+        setStatus('error');
+        setMessage('Anda sudah absen pulang hari ini.');
+        return;
+      }
     }
 
     setLoading(true);
     try {
+      const lokasiStr = `${latitude},${longitude}`;
       let res;
       if (isAbsenMasukAllowed) {
-        res = await api.post('/absensi/masuk', { latitude, longitude });
+        res = await api.post('/absensi/masuk', { lokasi: lokasiStr });
       } else if (isAbsenKeluarAllowed) {
-        res = await api.post('/absensi/keluar', { latitude, longitude });
+        res = await api.post('/absensi/keluar', { lokasi: lokasiStr });
       } else {
         setStatus('error');
         setMessage('Tidak dalam waktu absen yang diizinkan.');
@@ -159,29 +165,49 @@ const Absen = () => {
       setMessage(res.data.message);
       if (res.data.absen) {
         localStorage.setItem('absen_status', JSON.stringify(res.data.absen));
+        setHariIni(res.data.absen);
+      } else {
+        // fallback refresh
+        getAbsenHariIni();
       }
-      await getAbsenHariIni();
     } catch (err) {
-      const response = err.response?.data;
-      if (response?.absen) {
-        setHariIni(response.absen);
-        localStorage.setItem('absen_status', JSON.stringify(response.absen));
+      const r = err.response?.data;
+      let msg = r?.message || 'Gagal melakukan absensi.';
+      // mapping type dari BE biar user ngerti
+      if (r?.type === 'belum_waktunya_pulang') {
+        msg = `Belum waktunya pulang. Jam pulang resmi ${day === 6 ? '14:00' : '16:00'}.`;
+      } else if (r?.type === 'batas_waktu_terlewati') {
+        msg = 'Batas waktu absen pulang (18:00) sudah terlewati.';
+      } else if (r?.type === 'sudah_masuk') {
+        msg = 'Anda sudah absen masuk hari ini.';
+      } else if (r?.type === 'sudah_keluar') {
+        msg = 'Anda sudah absen pulang hari ini.';
+      } else if (r?.type === 'izin_disetujui') {
+        msg = 'Tidak bisa absen, Anda sedang izin disetujui hari ini.';
+      }
+      if (r?.absen) {
+        setHariIni(r.absen);
+        localStorage.setItem('absen_status', JSON.stringify(r.absen));
       }
       setStatus('error');
-      setMessage(response?.message || 'Gagal melakukan absensi.');
+      setMessage(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  // Label tombol
   const tombolLabel = loadingHariIni
     ? 'Memuat...'
-    : !hariIni
+    : (!hariIni)
       ? 'Absen Masuk'
-      : !hariIni.jam_keluar
+      : (!hariIni.jam_keluar && isAbsenKeluarAllowed)
         ? 'Absen Pulang'
-        : 'Sudah Absen Hari Ini';
+        : (!hariIni.jam_keluar)
+          ? 'Menunggu Jam Pulang'
+          : 'Sudah Absen Hari Ini';
 
+  // Disable tombol
   const tombolDisabled =
     loadingHariIni ||
     isWithinRadius === false ||
@@ -190,15 +216,18 @@ const Absen = () => {
     (hariIni && hariIni.jam_keluar) ||
     (hariIni && !hariIni.jam_keluar && !isAbsenKeluarAllowed);
 
+  // Keterangan status (tampilkan “bisa absen pulang sekarang”)
   const keterangan = loadingHariIni
     ? 'Memuat status absen...'
-    : !hariIni && isAbsenMasukAllowed
+    : (!hariIni && isAbsenMasukAllowed)
       ? 'Anda bisa absen masuk sekarang.'
-      : hariIni && !hariIni.jam_keluar && !isAbsenKeluarAllowed
-        ? 'Anda sudah absen masuk. Tunggu jam pulang untuk absen keluar.'
-        : hariIni && hariIni.jam_keluar
-          ? 'Anda sudah menyelesaikan absen hari ini.'
-          : 'Di luar jam absen.';
+      : (hariIni && !hariIni.jam_keluar && isAbsenKeluarAllowed)
+        ? 'Anda bisa absen pulang sekarang.'
+        : (hariIni && !hariIni.jam_keluar && !isAbsenKeluarAllowed)
+          ? 'Anda sudah absen masuk. Tunggu jam pulang.'
+          : (hariIni && hariIni.jam_keluar)
+            ? 'Anda sudah menyelesaikan absen hari ini.'
+            : 'Di luar jam absen.';
 
   const waktuSekarang = now.toLocaleString('id-ID', {
     weekday: 'long',
@@ -222,19 +251,13 @@ const Absen = () => {
           ) : isWithinRadius ? (
             <>
               <CheckCircle size={48} className="text-green-500 mb-4" />
-              <p className="text-lg font-semibold text-gray-700">
-                Anda berada dalam radius lokasi kantor
-              </p>
+              <p className="text-lg font-semibold text-gray-700">Anda berada dalam radius lokasi kantor</p>
             </>
           ) : (
             <>
               <XCircle size={48} className="text-red-500 mb-4" />
-              <p className="text-lg font-semibold text-red-700">
-                Anda berada di luar radius lokasi
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Silakan menuju lokasi kantor untuk melakukan absensi
-              </p>
+              <p className="text-lg font-semibold text-red-700">Anda berada di luar radius lokasi</p>
+              <p className="text-sm text-gray-500 mt-1">Silakan menuju lokasi kantor untuk melakukan absensi</p>
             </>
           )}
 

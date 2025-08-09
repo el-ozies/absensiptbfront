@@ -1,3 +1,4 @@
+// src/components/absensipegawai/RiwayatTable.jsx
 import StatusBadge from './StatusBadge';
 import EmptyState from './EmptyState';
 

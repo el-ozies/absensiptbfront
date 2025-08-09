@@ -1,3 +1,4 @@
+// src/components/absensipegawai/AbsenStatus.jsx
 import StatusBadge from './StatusBadge';
 
 const AbsenStatus = ({ status = 'Belum Absen', waktuMasuk }) => {

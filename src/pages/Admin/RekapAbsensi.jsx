@@ -1,201 +1,149 @@
-import React, { useEffect, useState } from 'react';
-import LayoutWrapper from '../../components/LayoutWrapper';
-import StatusBadge from '../../components/StatusBadge';
-import api from '../../api/axios';
-import { saveAs } from 'file-saver';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
-
+// src/pages/admin/RekapAbsensi.jsx
+import React, { useEffect, useState } from "react";
+import LayoutWrapper from "../../components/common/LayoutWrapper";
+import { getRekapAbsensi } from "../../api/absensi";
+import { saveAs } from "file-saver";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import ExportButton from "../../components/admin/ExportButton";
+import RekapTable from "../../components/admin/RekapTable";
 
 const RekapAbsensi = () => {
   const [rekap, setRekap] = useState([]);
-  const [tanggal, setTanggal] = useState('');
+  const [tanggal, setTanggal] = useState("");
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Atur tanggal default ke hari ini saat pertama kali render
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = new Date().toISOString().split("T")[0];
     setTanggal(today);
   }, []);
 
-  // Ambil data rekap jika tanggal sudah dipilih
   useEffect(() => {
-    if (tanggal) {
-      fetchRekap();
-    }
+    if (tanggal) fetchRekap();
   }, [tanggal]);
 
   const fetchRekap = async () => {
-    if (!tanggal) return;
     setLoading(true);
     try {
-      const response = await api.get('/absensi/rekap', {
-        params: { tanggal },
-      });
-      setRekap(response.data || []);
+      const res = await getRekapAbsensi(tanggal);
+      const filtered = (res.data || []).filter(row => new Date(row.tanggal).getDay() !== 0);
+      setRekap(filtered);
     } catch (err) {
-      alert('Gagal mengambil data rekap');
+      console.error("❌ Gagal mengambil rekap:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFilter = (e) => {
-    e.preventDefault();
-    if (tanggal) fetchRekap();
-  };
-
   const handleReset = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     setTanggal(today);
-    setSearchTerm('');
+    setSearchTerm("");
+    fetchRekap();
   };
 
-  const filteredData = rekap.filter((item) => {
-    const matchSearch =
-      item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.nip.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchSearch;
-  });
+  const formatTanggalID = (dateStr) => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const filteredData = rekap.filter((item) =>
+    item.nama?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.nip?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleExportExcel = () => {
-    const exportData = filteredData.map(row => ({
-      Tanggal: row.tanggal,
+    const exportData = filteredData.map((row) => ({
       Nama: row.nama,
       NIP: row.nip,
-      Masuk: row.jam_masuk || '-',
-      Keluar: row.jam_keluar || '-',
+      Tanggal: formatTanggalID(row.tanggal),
+      "Jam Wajib": row.jam_wajib,
+      "Jam Masuk": row.jam_masuk || "-",
+      "Jam Pulang": row.jam_keluar || "-",
+      "Jam Aktual": row.jam_aktual || "-",
+      Keterlambatan: row.keterlambatan || "-",
       Status: row.status,
-      Kehadiran: row.kehadiran,
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Rekap');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const file = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(file, `rekap-${tanggal}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap");
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([excelBuffer], { type: "application/octet-stream" }), `rekap-${tanggal}.xlsx`);
   };
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    doc.text(`Rekap Absensi - ${tanggal}`, 14, 10);
+    doc.text(`Rekap Absensi - ${formatTanggalID(tanggal)}`, 14, 10);
     autoTable(doc, {
       startY: 20,
-      head: [['Tanggal', 'Nama', 'NIP', 'Masuk', 'Keluar', 'Status', 'Kehadiran']],
-      body: filteredData.map(row => [
-        row.tanggal,
+      head: [["Nama", "NIP", "Tanggal", "Jam Wajib", "Jam Masuk", "Jam Pulang", "Jam Aktual", "Keterlambatan", "Status"]],
+      body: filteredData.map((row) => [
         row.nama,
         row.nip,
-        row.jam_masuk || '-',
-        row.jam_keluar || '-',
+        formatTanggalID(row.tanggal),
+        row.jam_wajib,
+        row.jam_masuk || "-",
+        row.jam_keluar || "-",
+        row.jam_aktual || "-",
+        row.keterlambatan || "-",
         row.status,
-        row.kehadiran
-      ])
+      ]),
     });
     doc.save(`rekap-${tanggal}.pdf`);
   };
 
   return (
     <LayoutWrapper>
-      <div className="p-6 flex flex-col gap-6">
-        <h1 className="text-3xl font-bold text-gray-800">Rekap Absensi</h1>
+      <div className="p-6 space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-800">Rekap Absensi</h1>
 
-        {/* Filter & Search */}
-        <form onSubmit={handleFilter} className="flex flex-col sm:flex-row sm:items-end gap-4">
+        {/* Filter dan Export */}
+        <div className="flex flex-col md:flex-row md:items-end gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Tanggal</label>
             <input
               type="date"
               value={tanggal}
               onChange={(e) => setTanggal(e.target.value)}
-              className="px-3 py-2 border rounded-md w-full"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
             />
           </div>
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cari Nama / NIP</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Cari Nama / NIP</label>
             <input
               type="text"
               placeholder="Cari..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-2 border rounded-md w-full"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
             />
           </div>
           <div className="flex gap-2">
             <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Terapkan
-            </button>
-            <button
-              type="button"
               onClick={handleReset}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition"
             >
               Reset
             </button>
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-            >
-              Export Excel
-            </button>
-            <button
-              type="button"
-              onClick={handleExportPDF}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              Export PDF
-            </button>
+            <ExportButton
+              onExportExcel={handleExportExcel}
+              onExportPDF={handleExportPDF}
+            />
           </div>
-        </form>
-
-        {/* Table */}
-        <div className="overflow-x-auto mt-4">
-          {loading ? (
-            <p className="text-gray-500">Memuat data...</p>
-          ) : (
-            <table className="min-w-full text-sm border border-gray-300 rounded-md">
-              <thead className="bg-gray-100 text-gray-700">
-                <tr>
-                  <th className="px-4 py-2 border">Tanggal</th>
-                  <th className="px-4 py-2 border">Nama</th>
-                  <th className="px-4 py-2 border">NIP</th>
-                  <th className="px-4 py-2 border">Masuk</th>
-                  <th className="px-4 py-2 border">Keluar</th>
-                  <th className="px-4 py-2 border">Status</th>
-                  <th className="px-4 py-2 border">Kehadiran</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.length > 0 ? (
-                  filteredData.map((row, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 border">{row.tanggal}</td>
-                      <td className="px-4 py-2 border">{row.nama}</td>
-                      <td className="px-4 py-2 border">{row.nip}</td>
-                      <td className="px-4 py-2 border">{row.jam_masuk || '-'}</td>
-                      <td className="px-4 py-2 border">{row.jam_keluar || '-'}</td>
-                      <td className="px-4 py-2 border"><StatusBadge status={row.status} /></td>
-                      <td className="px-4 py-2 border font-medium">{row.kehadiran || '0%'}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="7" className="px-4 py-3 text-center text-gray-500">
-                      Tidak ada data absensi.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
         </div>
+
+        {/* Tabel */}
+        {loading ? (
+          <p className="text-gray-500">Memuat data...</p>
+        ) : (
+          <RekapTable data={filteredData} />
+        )}
       </div>
     </LayoutWrapper>
   );

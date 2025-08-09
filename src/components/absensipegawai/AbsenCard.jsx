@@ -1,3 +1,4 @@
+// src/components/absensipegawai/AbsenCard.jsx
 import StatusBadge from './StatusBadge';
 
 const AbsenCard = ({ tanggal, jamMasuk, jamKeluar, status }) => {

@@ -1,3 +1,4 @@
+// src/components/admin/CetakButton.jsx
 import React from 'react';
 const CetakButton = ({ onClick }) => {
   return (

@@ -1,43 +1,23 @@
-import React from 'react';
-import {
-  CheckCircle,
-  XCircle,
-  Clock,
-  FileClock,
-  CalendarDays,
-} from 'lucide-react';
+// src/components/admin/StatBox.jsx
+import React from "react";
+import { FiUserCheck, FiUserX, FiClock, FiUsers, FiCalendar } from "react-icons/fi";
 
 const iconMap = {
-  hadir: {
-    icon: <CheckCircle className="text-green-600" size={20} />,
-    color: 'text-green-600',
-  },
-  alpha: {
-    icon: <XCircle className="text-red-600" size={20} />,
-    color: 'text-red-600',
-  },
-  terlambat: {
-    icon: <Clock className="text-yellow-500" size={20} />,
-    color: 'text-yellow-500',
-  },
-  izin: {
-    icon: <FileClock className="text-blue-500" size={20} />,
-    color: 'text-blue-500',
-  },
-  hariKerja: {
-    icon: <CalendarDays className="text-indigo-500" size={20} />,
-    color: 'text-indigo-500',
-  },
+  hadir: <FiUserCheck className="text-green-600 w-6 h-6" />,
+  alpha: <FiUserX className="text-red-600 w-6 h-6" />,
+  warning: <FiClock className="text-yellow-600 w-6 h-6" />,
+  info: <FiUsers className="text-blue-600 w-6 h-6" />,
+  calendar: <FiCalendar className="text-gray-600 w-6 h-6" />,
 };
 
-const StatBox = ({ label, value = 0, type = 'hadir' }) => {
-  const current = iconMap[type] || iconMap.hadir;
-
+const StatBox = ({ label, value, type }) => {
   return (
-    <div className="bg-white rounded-lg shadow p-4 w-full sm:w-52 text-center">
-      <div className="flex justify-center mb-2">{current.icon}</div>
-      <h4 className="text-sm text-gray-600">{label}</h4>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
+    <div className="bg-white shadow rounded-xl p-4 flex items-center gap-4 border border-gray-100 hover:shadow-md transition-all">
+      <div className="bg-gray-100 p-3 rounded-full">{iconMap[type] || iconMap.info}</div>
+      <div>
+        <p className="text-sm text-gray-500">{label}</p>
+        <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
+      </div>
     </div>
   );
 };

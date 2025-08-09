@@ -1,3 +1,4 @@
+// src/components/common/MapView.jsx
 import React from 'react';
 import { MapContainer, TileLayer, Marker, Circle, Popup } from 'react-leaflet';
 import L from 'leaflet';
